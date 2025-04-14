@@ -1,4 +1,4 @@
-export { createCard };
+export { createCard,likeCard,deleteCard };
 
 const cardTemplate = document.querySelector('#card-template').content; 
 const elementForClone = cardTemplate.querySelector('.places__item');
@@ -31,3 +31,11 @@ function createCard({
 }
 
 
+function likeCard(likeButton) {
+    likeButton.classList.toggle("card__like-button_is-active");
+  }
+  
+  function deleteCard(delButton) {
+    const listItem = delButton.closest('.card');
+    listItem.remove()
+  }
