@@ -67,10 +67,11 @@ function showInputError(formElement, inputElement, settings) {
   
 function hideInputError(formElement, inputElement, settings) {
     const errorElement = formElement.querySelector(`.${inputElement.id}-error`);
-
+  
     inputElement.classList.remove(settings.inputErrorClass);
-
+    inputElement.setCustomValidity(""); // Сбрасываем кастомное сообщение об ошибке
+  
     errorElement.textContent = '';
     errorElement.classList.remove(settings.errorClass);
-};
+  };
 
