@@ -1,96 +1,251 @@
 import "../pages/index.css";
-import { initialCards } from "../components/cards";
-import { closeModal, openModal, setModalWindowEventListeners } from "../components/modal";
-import { createCard,likeCard,deleteCard } from "../components/card";
+import { closeModal, openModal, setModalWindowEventListeners } from "../components/modal.js";
+import { createCard } from "../components/card";
+import {enableValidation, clearValidation} from './validation.js';
+import {
+    API_addOneMoreCard, 
+    API_changeUserInfo, 
+    API_deleteCard, 
+    API_getUsersMe, 
+    API_getCards, 
+    API_setAvatar,
+    secretConfig
+} from './API.js';
 
+let userMe;
 
 const formEditProfile = document.querySelector('[name="edit-profile"]')
 const nameInput = formEditProfile.querySelector('.popup__input_type_name');
-const jobInput = formEditProfile.querySelector('.popup__input_type_description');
+const descriptionInput = formEditProfile.querySelector('.popup__input_type_description');
 
+const profileImage = document.querySelector('.profile__image');
 const profileTitle = document.querySelector('.profile__title');
 const profileDescription = document.querySelector('.profile__description');
+const changeAvatarPopup = document.querySelector('.popup_type_change-avatar');
+const changeAvatarForm = changeAvatarPopup.querySelector('form');
+const avatarNewURLInput = changeAvatarPopup.querySelector('[name="new-avatar-url"]');
 
 const formNewPlace = document.querySelector('[name="new-place"]')
-const cardNameInput = formNewPlace.querySelector('.popup__input_type_card-name');
-const urlInput = formNewPlace.querySelector('.popup__input_type_url');
+const cardNameInput = formNewPlace.querySelector('[name="new-place-name"]');
+const cardNewURLInput = formNewPlace.querySelector('[name="new-card-url"]');
 
-const imagePopup = document.querySelector('.popup_type_image');
-const popupImage = imagePopup.querySelector('.popup__image');
-const popupCaption = imagePopup.querySelector('.popup__caption');
+
+const imagePopup =   document.querySelector('.popup_type_image');
+const imagePopupImage = imagePopup.querySelector('.popup__image');
+const imagePopupCaption = imagePopup.querySelector('.popup__caption');
+
+const deleteCardPopup = document.querySelector('.popup_type_delete-card');
+const deleteCardForm = document.querySelector('[name="delete-card"]')
 
 const placesList = document.querySelector('.places__list');
 
+const addButton =  document.querySelector('.profile__add-button');
+const addPopup =   document.querySelector('.popup_type_new-card');
+const addForm = addPopup.querySelector('.popup__form');
 
-// показать все карточки
-initialCards.forEach(function (cardInit) {
-  renderCard(cardInit, "append");
-});
-
-const addButton = document.querySelector('.profile__add-button');
-const addPopup = document.querySelector('.popup_type_new-card');
-addButton.addEventListener('click', () => openModal(addPopup, null));
-
-const editButton = document.querySelector('.profile__edit-button');
-const editPopup = document.querySelector('.popup_type_edit');
-editButton.addEventListener('click', () => openModal(editPopup, beforeEditPopupOpened));
-
-formNewPlace.addEventListener('submit', handleNewPlaceFormSubmit);
+const editButton =  document.querySelector('.profile__edit-button');
+const editPopup =   document.querySelector('.popup_type_edit');
 
 const popUps = document.querySelectorAll(".popup");
-popUps.forEach(setModalWindowEventListeners);
+
+const validationConfig = {
+    formSelector: '.popup__form',
+    inputSelector: '.popup__input',
+    submitButtonSelector: '.popup__button',
+    inactiveButtonClass: 'popup__button_disabled',
+    inputErrorClass: 'popup__input_type_error',
+    errorClass: 'popup__error_visible'
+}
 
 
+function beforeChangeAvatarPopupOpened() {
+    avatarNewURLInput.value = 'https://';
+    clearValidation(changeAvatarForm, validationConfig);
+}
+
+function beforeNewCardPopupOpened() {
+    cardNameInput.value = '';
+    cardNewURLInput.value = 'https://';
+    clearValidation(addForm, validationConfig);
+}
 
 function beforeEditPopupOpened() {
-  nameInput.value = profileTitle.textContent;
-  jobInput.value = profileDescription.textContent;
+    nameInput.value = profileTitle.textContent;
+    descriptionInput.value = profileDescription.textContent;
+    clearValidation(formEditProfile, validationConfig);
 }
 
-function handleEditFormSubmit(evt) {
-  evt.preventDefault();
-  profileTitle.textContent = nameInput.value;
-  profileDescription.textContent = jobInput.value;
-  closeModal(editPopup);
+function openCardPopup( title, link) {
+    imagePopupImage.src = link;
+    imagePopupImage.alt = title;
+    imagePopupCaption.textContent = title;
+
+    openModal(imagePopup, null);
 }
 
-formEditProfile.addEventListener('submit', handleEditFormSubmit);
+function handleNewPlaceFormSubmit(event) {
+    event.preventDefault();
 
-function openCardPopup(title, link) {
-  popupImage.src = link;
-  popupImage.alt = title;
-  popupCaption.textContent = title;
+    const newName = cardNameInput.value;
+    const newLink = cardNewURLInput.value;
 
-  openModal(imagePopup, null);
+    const submitButton = event.submitter;
+    const originalTextContent = submitButton.textContent;
+    submitButton.textContent = "Сохранение...";
+    submitButton.disabled = true;
+
+    API_addOneMoreCard(secretConfig, newName, newLink)
+        .then(newCardFromServer => {
+            renderCard({ cardObject: newCardFromServer });
+            closeModal(addPopup);
+        })
+        .catch(err => {
+            console.error("Ошибка при добавлении карточки:", err);
+        })
+        .finally (() => {
+            formNewPlace.reset();
+            submitButton.textContent = originalTextContent;
+            submitButton.disabled = false;
+        })
+
+};
+
+function renderCard({ cardObject, canDelete = true, isLiked = false, method = "prepend" }) {
+    placesList[method](
+        createCard({
+            cardObject,
+            deleteFunction: deleteCard,
+            onCardClickFunction: openCardPopup,
+           // toggleLikeHandler, 
+            canDelete,
+            isLiked
+        })
+    );
 }
 
-function handleNewPlaceFormSubmit(evt) {
-  evt.preventDefault();
+function showProfile() {
+    profileTitle.textContent = userMe.name;
+    profileDescription.textContent = userMe.about;
+    profileImage.style.backgroundImage = `url(${userMe.avatar})`;
+};
 
-  const newCard = {};
-  newCard.name = cardNameInput.value;
-  newCard.link = urlInput.value
-  // по умолчанию, добавляет в начало списка
-  renderCard(newCard);
+function submitDeleteCard(event, cardElement, cardId) {
+    event.preventDefault();
 
-  formNewPlace.reset();
+    const submitButton = event.submitter;
+    const originalTextContent = submitButton.textContent;
+    submitButton.textContent = "Удаление...";
+    submitButton.disabled = true;
 
-  closeModal(addPopup);
+    API_deleteCard(secretConfig, cardId)
+        .then(() => {
+            cardElement.remove();
+            closeModal(deleteCardPopup);
+        })
+        .catch(err => {
+            console.error('Ошибка при удалении карточки:', err);
+        })
+        .finally (() => {
+            submitButton.textContent = originalTextContent;
+            submitButton.disabled = false;            
+        });
 }
 
-function renderCard(item, method = "prepend") {
-  placesList[method](
-    createCard(
-      {
-        cardInit: item,
-        deleteFunction: deleteCard,
-        onCardClickFunction: openCardPopup,
-        likeFunction: likeCard
-      }
-    )
-  );
+function deleteCard(delButton, cardId) {
+    const cardElement = delButton.closest('.card');
+    openModal(deleteCardPopup, null);
+    deleteCardForm.onsubmit = (evt) => submitDeleteCard(evt, cardElement, cardId);
 }
 
 
+
+
+Promise.all([API_getUsersMe(secretConfig), API_getCards(secretConfig)])
+    .then(([user, cardsArray]) => {
+        userMe = user;
+        showProfile();
+
+        cardsArray.forEach(function (card) {
+                const canDelete = (card.owner._id === userMe._id);
+                const isLiked = card.likes.some(user => user._id === userMe._id);
+                renderCard({
+                    cardObject : card, 
+                    canDelete: canDelete, 
+                    isLiked: isLiked,
+                    method : "append"
+                });
+            })
+        })
+    .catch((err) => {
+        console.log(err);
+    });
+
+profileImage.addEventListener('click', () => openModal(changeAvatarPopup, beforeChangeAvatarPopupOpened));
+    
+addButton.addEventListener('click', () => openModal(addPopup, beforeNewCardPopupOpened));
+editButton.addEventListener('click', () => openModal(editPopup, beforeEditPopupOpened));
+formNewPlace.addEventListener('submit', handleNewPlaceFormSubmit);
+
+changeAvatarForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+  
+    const input = changeAvatarForm.querySelector('#input_avatar-image');
+    const newAvatarUrl = input.value;
+
+    const submitButton = event.submitter;
+    const originalTextContent = submitButton.textContent;
+    submitButton.textContent = "Сохранение...";
+    submitButton.disabled = true;
+  
+    API_setAvatar(secretConfig, newAvatarUrl)
+        .then((updatedUser) => {
+            profileImage.style.backgroundImage = `url(${updatedUser.avatar})`;
+            closeModal(changeAvatarPopup);
+        })
+        .catch(err => {
+            console.error('Ошибка при обновлении аватара:', err);
+        })
+        .finally (() => {
+            changeAvatarForm.reset();
+            submitButton.textContent = originalTextContent;
+            submitButton.disabled = false;
+        });
+});
+
+formEditProfile.addEventListener('submit', function (event) {
+    event.preventDefault();
+    const newName = nameInput.value;
+    const newJob = descriptionInput.value;
+  
+    const submitButton = event.submitter;
+    const originalTextContent = submitButton.textContent;
+    submitButton.textContent = "Сохранение...";
+    submitButton.disabled = true;
+
+    API_changeUserInfo(secretConfig, newName, newJob)
+        .then((data) => {
+            profileTitle.textContent = data.name;
+            profileDescription.textContent = data.about;
+            closeModal(editPopup);
+        })
+        .catch((err) => {
+            console.error('Ошибка при обновлении профиля:', err);
+        })
+        .finally (() => {
+            submitButton.textContent = originalTextContent;
+            submitButton.disabled = false;
+        });
+});
+
+popUps.forEach((ModalWidow) => {
+    setModalWindowEventListeners(ModalWidow);
+
+    const form = ModalWidow.querySelector(validationConfig.formSelector);
+    if (form) {
+        clearValidation(form, validationConfig);
+    };
+})
+
+enableValidation(validationConfig);
 
 

@@ -1,9 +1,10 @@
 export {
   closeModal,
-  openModal
+  openModal,
+  setModalWindowEventListeners
 };
 
-export const setModalWindowEventListeners = (modalWindow) => {
+ const setModalWindowEventListeners = (modalWindow) => {
   modalWindow.classList.add("popup_is-animated");
 
   //  Добавить обработчик события click на кнопку закрытия
