@@ -74,4 +74,3 @@ function hideInputError(formElement, inputElement, settings) {
     errorElement.textContent = '';
     errorElement.classList.remove(settings.errorClass);
   };
-
