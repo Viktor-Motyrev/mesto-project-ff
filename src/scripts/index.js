@@ -97,13 +97,13 @@ function handleNewPlaceFormSubmit(event) {
     API_addOneMoreCard(secretConfig, newName, newLink)
         .then(newCardFromServer => {
             renderCard({ cardObject: newCardFromServer });
+            formNewPlace.reset();
             closeModal(addPopup);
         })
         .catch(err => {
             console.error("Ошибка при добавлении карточки:", err);
         })
         .finally (() => {
-            formNewPlace.reset();
             submitButton.textContent = originalTextContent;
             submitButton.disabled = false;
         })
@@ -200,13 +200,13 @@ changeAvatarForm.addEventListener('submit', (event) => {
     API_setAvatar(secretConfig, newAvatarUrl)
         .then((updatedUser) => {
             profileImage.style.backgroundImage = `url(${updatedUser.avatar})`;
+            changeAvatarForm.reset();
             closeModal(changeAvatarPopup);
         })
         .catch(err => {
             console.error('Ошибка при обновлении аватара:', err);
         })
         .finally (() => {
-            changeAvatarForm.reset();
             submitButton.textContent = originalTextContent;
             submitButton.disabled = false;
         });
@@ -226,6 +226,7 @@ formEditProfile.addEventListener('submit', function (event) {
         .then((data) => {
             profileTitle.textContent = data.name;
             profileDescription.textContent = data.about;
+            formEditProfile.reset();
             closeModal(editPopup);
         })
         .catch((err) => {
